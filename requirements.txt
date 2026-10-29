@@ -1,3 +1,4 @@
-# Phase 0 keeps the application startable without camera or model dependencies.
+# Phase 1 camera adapter and local preview dependencies, plus project tests.
+opencv-python>=4.9,<5.0
 python-dotenv>=1.0,<2.0
 pytest>=8.0,<9.0

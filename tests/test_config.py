@@ -8,6 +8,7 @@ from app.config import Settings
 def test_optional_environment_values_use_safe_defaults(monkeypatch):
     for name in (
         "SSS_CAMERA_SOURCE", "SSS_MODEL_NAME", "SSS_CONFIDENCE_THRESHOLD",
+        "SSS_CAMERA_RECONNECT_ATTEMPTS",
         "SSS_STORAGE_DIR", "SSS_EVENT_COOLDOWN_SECONDS", "SSS_TELEGRAM_ENABLED",
         "SSS_TELEGRAM_BOT_TOKEN", "SSS_TELEGRAM_CHAT_ID",
     ):
@@ -16,6 +17,7 @@ def test_optional_environment_values_use_safe_defaults(monkeypatch):
     settings = Settings.from_env()
 
     assert settings.camera_source == "0"
+    assert settings.camera_reconnect_attempts == 3
     assert settings.confidence_threshold == 0.5
     assert settings.event_cooldown_seconds == 5
     assert settings.telegram_enabled is False

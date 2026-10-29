@@ -4,7 +4,7 @@ These contracts are initial design boundaries. Later phases may add fields where
 
 | Module | Input | Output / contract |
 |---|---|---|
-| Camera source | Source configuration | `connect()`, `read_frame()`, `status()`, `release()`; frames use OpenCV image arrays and status is explicit |
+| Camera source | Device index, V4L2 path, OpenCV-compatible stream URL or recorded video path | `connect()`, `read_frame()`, `status()`, `release()`; OpenCV frames and explicit connection/reconnect/error status |
 | Person detector | Frame | Zero or more detections with frame-relative box, class label and confidence |
 | Tracker | Detections plus prior tracker state | Tracked people with temporary ID, box and bottom-centre anchor |
 | Boundary engine | Tracked anchors and normalized line/direction settings | Crossing candidate with camera, temporary track, boundary, direction and timestamp; no UI dependency |

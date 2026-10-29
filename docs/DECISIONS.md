@@ -5,6 +5,7 @@
 | Decision | Rationale / source |
 |---|---|
 | Use Python with OpenCV, Streamlit, SQLite and pytest in the prototype | These are the PRD's settled stack choices. |
+| Use `cv2.VideoCapture` behind an adapter for device indices, device paths, stream URLs and recorded videos | Keeps source-specific access replaceable and allows recorded-video fallback; the stream transport must be verified for each source. |
 | Keep camera sources behind an adapter | Required for DroidCam initial support and replaceable sources. |
 | Use a normalized virtual line and bottom-centre person anchor | Roadmap's starting convention; line is not a physical distance. |
 | Crossing is the event trigger; face recognition and Telegram are optional | PRD's operating principles and failure-isolation requirements. |

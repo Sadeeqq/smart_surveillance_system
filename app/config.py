@@ -44,6 +44,7 @@ class Settings:
     """Runtime settings. Secrets remain optional and are never logged."""
 
     camera_source: str
+    camera_reconnect_attempts: int
     model_name: str
     confidence_threshold: float
     storage_dir: Path
@@ -62,9 +63,13 @@ class Settings:
         cooldown = _read_int("SSS_EVENT_COOLDOWN_SECONDS", 5)
         if cooldown < 0:
             raise ValueError("SSS_EVENT_COOLDOWN_SECONDS cannot be negative")
+        reconnect_attempts = _read_int("SSS_CAMERA_RECONNECT_ATTEMPTS", 3)
+        if reconnect_attempts < 0:
+            raise ValueError("SSS_CAMERA_RECONNECT_ATTEMPTS cannot be negative")
 
         return cls(
             camera_source=os.getenv("SSS_CAMERA_SOURCE", "0").strip() or "0",
+            camera_reconnect_attempts=reconnect_attempts,
             model_name=os.getenv("SSS_MODEL_NAME", "yolo11n.pt").strip() or "yolo11n.pt",
             confidence_threshold=confidence,
             storage_dir=Path(os.getenv("SSS_STORAGE_DIR", "data")).expanduser(),
