@@ -1,6 +1,6 @@
 # Smart Surveillance System
 
-A local-first prototype for detecting and tracking people and creating an event when a tracked person crosses an operator-configured virtual line. Face processing is optional enrichment, and an unknown/no-match result is not evidence of wrongdoing. The project is being built incrementally according to the PRD. Phase 2 adds a YOLO person detector and debug preview; tracking and later pipeline stages have not been implemented yet.
+A local-first prototype for detecting and tracking people and creating an event when a tracked person crosses an operator-configured virtual line. Face processing is optional enrichment, and an unknown/no-match result is not evidence of wrongdoing. The project is being built incrementally according to the PRD. Phase 3 adds ByteTrack temporary IDs and a trajectory preview; boundary events and later pipeline stages have not been implemented yet.
 
 ## Requirements
 
@@ -33,6 +33,17 @@ python -m app.detection_test path/to/test-video.mp4
 The first install uses the official CPU-only PyTorch wheel index. Install it before `requirements-detection.txt` so pip does not pull the much larger NVIDIA CUDA packages on a CPU-only setup. The same CPU-only PyTorch command is used by the Phase 2 development environment.
 
 The preview displays person boxes and confidence scores. Press `q` or Esc to close it. `SSS_MODEL_NAME`, `SSS_CONFIDENCE_THRESHOLD`, `SSS_DETECTION_IMAGE_SIZE`, and `SSS_DETECTION_DEVICE` configure the model, minimum score, inference image size, and inference device (`cpu` by default). Do not assume a particular FPS; measure it on the target computer and footage.
+
+## Person tracking preview (Phase 3)
+
+The tracker uses Ultralytics' supported ByteTrack integration with a persistent tracker instance for each source. Install the Phase 2 detection requirements (which include ByteTrack's optional `lap` matching dependency). IDs are temporary, may change after occlusion or missed detections, and must not be treated as identity. The preview draws short bottom-centre trajectories. Run it with a camera or recorded video:
+
+```bash
+python -m app.tracking_test /dev/video2 --image-size 320
+python -m app.tracking_test path/to/test-video.mp4 --image-size 320
+```
+
+Press `q` or Esc to close. `SSS_TRACKING_CONFIDENCE_THRESHOLD` controls the detector threshold supplied to tracking (default `0.1`, allowing ByteTrack to use lower-confidence detections), `SSS_TRACKER_CONFIG` selects an Ultralytics tracker YAML (default `bytetrack.yaml`), and `SSS_TRACKING_TRAIL_LENGTH` controls how many recent points are drawn. The tracking command also accepts `--confidence`, `--tracker`, `--trail-length`, `--image-size`, and `--device` overrides. See [docs/TEST_PLAN.md](docs/TEST_PLAN.md) for the Phase 3 manual check.
 
 **Licensing:** Ultralytics states that its code and trained models are AGPL-3.0 by default. Using them in a distributed application may require licensing the complete combined project under AGPL-3.0 or obtaining an Ultralytics Enterprise licence. Review [Ultralytics licensing](https://www.ultralytics.com/license) before distributing or deploying this integration. The project has not yet selected a final distribution licence.
 

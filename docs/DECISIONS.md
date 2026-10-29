@@ -13,13 +13,13 @@
 | Python 3.12 is the initial development baseline | Available in the project environment; dependency compatibility will be validated in relevant phases. |
 | Use the small Ultralytics YOLO11n detection checkpoint as the Phase 2 prototype candidate, without committing its weights | It is the smallest YOLO11 detection model listed by Ultralytics and provides a pretrained COCO person class. This is only a prototype candidate; CPU performance and suitability on the target camera footage need measurement. Ultralytics states its code and trained models are AGPL-3.0 by default. Distribution under that route requires licensing the complete application accordingly; private/commercial use may require an Enterprise licence. |
 | Keep person detection behind an injectable detector interface and leave model loading optional/lazy | Keeps the camera path usable without a model installation and makes detector unit tests independent of large model packages and weights. |
+| Use Ultralytics' supported `model.track()` API with ByteTrack for Phase 3, with persistent state scoped to one video source | Reuses the installed detector runtime, avoids a second tracking dependency, and provides temporary IDs across consecutive frames. Tracker settings can be selected centrally and overridden with the Ultralytics tracker YAML configuration. |
 
 ## Open decisions to validate
 
 | Question | Why unresolved | Planned resolution |
 |---|---|---|
 | Is the project to be distributed under AGPL-3.0 if Ultralytics YOLO is used, or is a different model/licence path required? | Ultralytics says its code and trained models are AGPL-3.0 by default and this can impose source-release obligations on the combined application. | Review before distributing a build that includes or uses Ultralytics. |
-| Which compatible ByteTrack implementation? | Must validate package compatibility with detector/runtime. | Phase 3. |
 | Which dedicated face detector and whether DeepFace + FaceNet is viable? | Explicit candidate; licensing, dependency, runtime and false-match checks required. | Phase 5 evaluation on authorized samples. |
 | Which camera/OS combinations will be listed as supported? | Compatibility varies by DroidCam client and transport. | Test and document actual combinations in Phase 1 and later platform checks. |
 | What retention duration and operator access policy apply? | PRD leaves retention and roles open and requires definition before real deployment. | Use conservative prototype handling; decide before any real deployment. |

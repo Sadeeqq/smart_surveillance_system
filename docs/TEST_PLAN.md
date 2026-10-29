@@ -4,7 +4,7 @@ Tests use pytest as specified in the PRD. Hardware-dependent checks will use moc
 
 | Test layer | Planned coverage | Phase |
 |---|---|---|
-| Unit | Configuration defaults/validation; detector person filtering, confidence, boxes, labels and annotation; boundary geometry, direction, jitter and re-arm; event schema; storage helpers | 0, 2, 4, 6 |
+| Unit | Configuration defaults/validation; detector person filtering, confidence, boxes, labels and annotation; tracker IDs, filtering, anchors and trajectory overlay; boundary geometry, direction, jitter and re-arm; event schema; storage helpers | 0, 2, 3, 4, 6 |
 | Integration | Mock/recorded frames through camera and detector, tracker and boundary; crossing through face attempt/event manager/SQLite; optional services failing independently | 1–7 |
 | End-to-end | Camera to visible, stored, reviewable event; restart and restore history/configuration | 7 |
 | Failure injection | Camera loss, model load/inference errors, track loss, no/poor face, DB/image write failures, Telegram offline/disabled | 1–8 |
@@ -30,5 +30,13 @@ Phase 2 must verify actual model inference on test footage separately from mocke
 - Automated: `.venv/bin/python -m pytest -q` — 16 passed, 0 failed, 0 skipped. Detector behavior is covered with a fake model (person filtering, confidence, coordinates/labels, configurable inference options, error propagation and non-mutating overlay); these tests do not claim actual YOLO inference.
 - CLI: `.venv/bin/python -m app.detection_test --help` — passed.
 - Actual inference smoke check: Ultralytics sample `bus.jpg`, 810×1080, `yolo11n.pt`, CPU, confidence 0.5, image size 640 — 4 person boxes returned (scores 0.888, 0.878, 0.856, 0.622). This confirms model loading and real inference on a public sample image, not the live phone camera or a recorded clip.
-- Not yet verified: boxes on the user's camera/recorded footage and target-device FPS/latency. No `/dev/video*` device is available to this workspace. Project distribution licence also remains undecided.
+- User manual live-camera check: DroidCam source `/dev/video2`, pretrained `yolo11n.pt`, CPU, confidence threshold 0.5, image size 320 — one person detected at score 0.78 and approximately 2.5 FPS. This confirms a basic live person-detection path, not precision/recall or model accuracy.
 - User manual command with the phone/OBS virtual camera running: `.venv/bin/python -m app.detection_test /dev/video2`. Point the phone at a clearly visible person and confirm a box plus confidence score appears; press `q` to exit. For recorded footage, use `.venv/bin/python -m app.detection_test path/to/test-video.mp4`. Record model, device, confidence, image size and observed FPS before accepting Phase 2.
+
+## Phase 3 verification record (implementation review)
+
+- Tracker: Ultralytics `model.track()` with the ByteTrack configuration; `persist=True` is used only for consecutive frames from one source. ByteTrack's `lap` matching dependency is included in `requirements-detection.txt`.
+- Automated tests cover tracked-person parsing, temporary IDs, bottom-centre anchors, tracker arguments/errors, configuration validation, and trajectory annotation with fake model outputs. These tests do not claim real ByteTrack association quality.
+- Real-runtime smoke check: bundled Ultralytics `bus.jpg`, pretrained `yolo11n.pt`, CPU, image size 320, two repeated frames — ByteTrack returned four person IDs (1–4) on both calls. This confirms the installed ByteTrack dependency and wrapper/API integration; repeated still frames do not establish movement or occlusion stability. PyTorch emitted non-fatal NNPACK unsupported-hardware warnings on this Atom CPU.
+- User manual live-camera check: DroidCam virtual-camera source `/dev/video2`, with its virtual-camera output active, CPU, image size 256 — user reports ByteTrack follows the moving person with the same temporary track number. FPS remained slow; no exact value was reported at 256. This confirms basic live ID continuity, not performance or accuracy guarantees.
+- The recorded-video preview remains available for repeatable checks: `.venv/bin/python -m app.tracking_test path/to/test-video.mp4`. IDs may change after occlusion, missed detections or stream restart; they are not identities. Additional multi-person, occlusion and recorded-footage checks remain for later reliability evaluation.

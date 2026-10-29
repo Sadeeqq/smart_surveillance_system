@@ -49,6 +49,9 @@ class Settings:
     confidence_threshold: float
     detection_image_size: int
     detection_device: str
+    tracking_confidence_threshold: float
+    tracker_config: str
+    tracking_trail_length: int
     storage_dir: Path
     event_cooldown_seconds: int
     telegram_enabled: bool
@@ -65,6 +68,12 @@ class Settings:
         image_size = _read_int("SSS_DETECTION_IMAGE_SIZE", 640)
         if image_size < 32:
             raise ValueError("SSS_DETECTION_IMAGE_SIZE must be at least 32")
+        tracking_confidence = _read_float("SSS_TRACKING_CONFIDENCE_THRESHOLD", 0.1)
+        if not 0.0 <= tracking_confidence <= 1.0:
+            raise ValueError("SSS_TRACKING_CONFIDENCE_THRESHOLD must be between 0 and 1")
+        tracking_trail_length = _read_int("SSS_TRACKING_TRAIL_LENGTH", 30)
+        if tracking_trail_length < 1:
+            raise ValueError("SSS_TRACKING_TRAIL_LENGTH must be at least 1")
         cooldown = _read_int("SSS_EVENT_COOLDOWN_SECONDS", 5)
         if cooldown < 0:
             raise ValueError("SSS_EVENT_COOLDOWN_SECONDS cannot be negative")
@@ -79,6 +88,9 @@ class Settings:
             confidence_threshold=confidence,
             detection_image_size=image_size,
             detection_device=os.getenv("SSS_DETECTION_DEVICE", "cpu").strip() or "cpu",
+            tracking_confidence_threshold=tracking_confidence,
+            tracker_config=os.getenv("SSS_TRACKER_CONFIG", "bytetrack.yaml").strip() or "bytetrack.yaml",
+            tracking_trail_length=tracking_trail_length,
             storage_dir=Path(os.getenv("SSS_STORAGE_DIR", "data")).expanduser(),
             event_cooldown_seconds=cooldown,
             telegram_enabled=_read_bool("SSS_TELEGRAM_ENABLED", False),
