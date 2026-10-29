@@ -1,6 +1,6 @@
 # Implementation Plan
 
-This plan follows the PRD's nine phases. Work stops after each phase for review and explicit approval before the next begins.
+This plan follows the PRD's phases 0 through 9. Work stops after each phase for review and explicit approval before the next begins.
 
 | Phase | Scope | Depends on | Exit evidence |
 |---|---|---|---|
@@ -17,4 +17,6 @@ This plan follows the PRD's nine phases. Work stops after each phase for review 
 
 Phase 0 selected Python 3.12 as the initial development baseline because it is available in the current environment. Runtime/model dependency compatibility remains to be checked before those dependencies are committed in their respective phases. Candidate models remain candidates until validated as required by the PRD.
 
-Phase 1 implementation is in progress on `codex/phase-1-camera`. Mock-capture and generated-video checks pass, but the required real camera/DroidCam setup has not been verified because this environment exposes no `/dev/video*` device. Do not treat Phase 1 as complete until that check is recorded.
+Phase 1 code is on `codex/phase-1-camera`. Mock-capture and generated-video checks passed. The user manually verified moving phone video through OBS DroidCam Virtual Camera at `/dev/video2`. When the phone feed stopped, the preview went blank while OBS kept the virtual device open; the preview utility emitted no disconnect message, so disconnect detection through this specific OBS path remains a known limitation.
+
+Phase 2 implementation is on `codex/phase-2-detection`. Detector and overlay unit tests pass; actual model inference remains unverified because the optional Ultralytics/PyTorch runtime is not installed and the current filesystem has under 1 GB free. The small Ultralytics YOLO11n checkpoint is a prototype candidate, not a production or licensing decision. Its package and trained weights are AGPL-3.0 by default according to Ultralytics; using them in a distributed version may require publishing the complete combined application under AGPL-3.0 or obtaining an Enterprise licence. No model weights will be committed. Runtime performance on the user's computer and model detection on representative footage still require manual verification.

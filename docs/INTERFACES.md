@@ -5,7 +5,7 @@ These contracts are initial design boundaries. Later phases may add fields where
 | Module | Input | Output / contract |
 |---|---|---|
 | Camera source | Device index, V4L2 path, OpenCV-compatible stream URL or recorded video path | `connect()`, `read_frame()`, `status()`, `release()`; OpenCV frames and explicit connection/reconnect/error status |
-| Person detector | Frame | Zero or more detections with frame-relative box, class label and confidence |
+| Person detector | Non-empty OpenCV frame | Zero or more person detections with frame-relative `xyxy` box, integer model class ID, class label and confidence in `[0, 1]`; raises a clear dependency/model error when its optional runtime is unavailable |
 | Tracker | Detections plus prior tracker state | Tracked people with temporary ID, box and bottom-centre anchor |
 | Boundary engine | Tracked anchors and normalized line/direction settings | Crossing candidate with camera, temporary track, boundary, direction and timestamp; no UI dependency |
 | Face detector/quality gate | Event context and relevant frames/region | Usable crop or explicit unavailable/low-quality result |
@@ -17,3 +17,5 @@ These contracts are initial design boundaries. Later phases may add fields where
 | Dashboard | Service interfaces and persisted events | Operator controls, preview/status and event history; no core business logic |
 
 The event record is expected to include event ID, timestamp, camera ID, temporary track ID, boundary ID, direction, detection confidence, face-capture status, recognition status, optional matched identity, image references and alert status. Exact schema is finalized with Phase 6 before implementation.
+
+The Phase 2 detector filters model outputs to the `person` label (case-insensitive) before returning detections. Confidence threshold and image size are configurable. Debug annotation is a presentation helper and does not mutate the camera frame or add tracking semantics; temporary IDs arrive in Phase 3.

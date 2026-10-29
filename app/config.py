@@ -47,6 +47,8 @@ class Settings:
     camera_reconnect_attempts: int
     model_name: str
     confidence_threshold: float
+    detection_image_size: int
+    detection_device: str
     storage_dir: Path
     event_cooldown_seconds: int
     telegram_enabled: bool
@@ -60,6 +62,9 @@ class Settings:
         confidence = _read_float("SSS_CONFIDENCE_THRESHOLD", 0.5)
         if not 0.0 <= confidence <= 1.0:
             raise ValueError("SSS_CONFIDENCE_THRESHOLD must be between 0 and 1")
+        image_size = _read_int("SSS_DETECTION_IMAGE_SIZE", 640)
+        if image_size < 32:
+            raise ValueError("SSS_DETECTION_IMAGE_SIZE must be at least 32")
         cooldown = _read_int("SSS_EVENT_COOLDOWN_SECONDS", 5)
         if cooldown < 0:
             raise ValueError("SSS_EVENT_COOLDOWN_SECONDS cannot be negative")
@@ -72,6 +77,8 @@ class Settings:
             camera_reconnect_attempts=reconnect_attempts,
             model_name=os.getenv("SSS_MODEL_NAME", "yolo11n.pt").strip() or "yolo11n.pt",
             confidence_threshold=confidence,
+            detection_image_size=image_size,
+            detection_device=os.getenv("SSS_DETECTION_DEVICE", "cpu").strip() or "cpu",
             storage_dir=Path(os.getenv("SSS_STORAGE_DIR", "data")).expanduser(),
             event_cooldown_seconds=cooldown,
             telegram_enabled=_read_bool("SSS_TELEGRAM_ENABLED", False),
