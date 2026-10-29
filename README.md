@@ -24,10 +24,13 @@ Copy `.env.example` to `.env` for local overrides. `.env` is ignored by Git; nev
 The detector uses the `yolo11n.pt` pretrained checkpoint as a small prototype candidate and filters detections to the COCO `person` class. On first use, Ultralytics may download the checkpoint to its local cache. Model weights, videos and other local data are not committed. The model runtime adds large PyTorch dependencies; ensure there is adequate free disk space before installing it:
 
 ```bash
+python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
 python -m pip install -r requirements-detection.txt
 python -m app.detection_test /dev/video2  # Linux DroidCam Virtual Camera example
 python -m app.detection_test path/to/test-video.mp4
 ```
+
+The first install uses the official CPU-only PyTorch wheel index. Install it before `requirements-detection.txt` so pip does not pull the much larger NVIDIA CUDA packages on a CPU-only setup. The same CPU-only PyTorch command is used by the Phase 2 development environment.
 
 The preview displays person boxes and confidence scores. Press `q` or Esc to close it. `SSS_MODEL_NAME`, `SSS_CONFIDENCE_THRESHOLD`, `SSS_DETECTION_IMAGE_SIZE`, and `SSS_DETECTION_DEVICE` configure the model, minimum score, inference image size, and inference device (`cpu` by default). Do not assume a particular FPS; measure it on the target computer and footage.
 

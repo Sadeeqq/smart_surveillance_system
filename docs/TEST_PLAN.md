@@ -26,8 +26,9 @@ Phase 2 must verify actual model inference on test footage separately from mocke
 
 ## Phase 2 verification record (implementation review)
 
-- Environment: Python 3.12 virtual environment, OpenCV installed, Linux; Ultralytics is not installed. The workspace filesystem has under 1 GB free, so the PyTorch-based optional runtime and downloaded weights were not installed here.
+- Environment: Python 3.12.3, Linux x86_64, OpenCV 4.14.0, Ultralytics 8.4.192, PyTorch 2.15.0+cpu, CPU inference. The detector runtime was installed in the project virtual environment, and `models/yolo11n.pt` was downloaded from the Ultralytics release assets. `models/` is Git-ignored.
 - Automated: `.venv/bin/python -m pytest -q` — 16 passed, 0 failed, 0 skipped. Detector behavior is covered with a fake model (person filtering, confidence, coordinates/labels, configurable inference options, error propagation and non-mutating overlay); these tests do not claim actual YOLO inference.
 - CLI: `.venv/bin/python -m app.detection_test --help` — passed.
-- Not yet verified: pretrained model load/download, person boxes on actual test footage, target-device FPS/latency and model licence choice for distribution.
-- Manual command after installing the optional runtime and ensuring sufficient disk space: `python -m pip install -r requirements-detection.txt`, then `python -m app.detection_test /dev/video2` or `python -m app.detection_test path/to/test-video.mp4`. Record the model, device, confidence, image size and observed FPS before accepting Phase 2.
+- Actual inference smoke check: Ultralytics sample `bus.jpg`, 810×1080, `yolo11n.pt`, CPU, confidence 0.5, image size 640 — 4 person boxes returned (scores 0.888, 0.878, 0.856, 0.622). This confirms model loading and real inference on a public sample image, not the live phone camera or a recorded clip.
+- Not yet verified: boxes on the user's camera/recorded footage and target-device FPS/latency. No `/dev/video*` device is available to this workspace. Project distribution licence also remains undecided.
+- User manual command with the phone/OBS virtual camera running: `.venv/bin/python -m app.detection_test /dev/video2`. Point the phone at a clearly visible person and confirm a box plus confidence score appears; press `q` to exit. For recorded footage, use `.venv/bin/python -m app.detection_test path/to/test-video.mp4`. Record model, device, confidence, image size and observed FPS before accepting Phase 2.

@@ -1,3 +1,4 @@
-# Optional Phase 2 runtime. PyTorch adds substantial disk use; weights download on first use.
+# Optional Phase 2 runtime. For CPU-only machines, install CPU PyTorch first (see README).
+# PyTorch adds substantial disk use; YOLO weights download on first use.
 -r requirements.txt
 ultralytics>=8.3,<9.0
