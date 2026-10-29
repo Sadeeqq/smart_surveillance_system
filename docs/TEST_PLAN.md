@@ -10,4 +10,4 @@ Tests use pytest as specified in the PRD. Hardware-dependent checks will use moc
 | Failure injection | Camera loss, model load/inference errors, track loss, no/poor face, DB/image write failures, Telegram offline/disabled | 1–8 |
 | Manual evaluation | Lighting, angles, occlusion, multiple people, authorized face samples, CLAHE comparison, FPS/latency/CPU/RAM | 2–8 |
 
-For each phase, record exact commands, pass/fail/skip counts, the environment, and unverified manual scenarios. Never treat startup alone as acceptance. Phase 0's current automated suite covers safe defaults and invalid confidence values; no camera/model checks are expected yet.
+For each phase, record exact commands, pass/fail/skip counts, the environment, and unverified manual scenarios. Never treat startup alone as acceptance. Phase 0's automated suite covers safe defaults, invalid confidence values and local `.env` precedence; no camera/model checks are expected yet.

@@ -37,3 +37,17 @@ def test_missing_telegram_settings_do_not_enable_notifications(monkeypatch):
 
     assert settings.telegram_enabled is False
     assert settings.telegram_chat_id is None
+
+
+def test_local_dotenv_is_loaded_without_overriding_process_environment(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("SSS_CAMERA_SOURCE", "7")
+    (tmp_path / ".env").write_text(
+        "SSS_CAMERA_SOURCE=2\nSSS_EVENT_COOLDOWN_SECONDS=12\n",
+        encoding="utf-8",
+    )
+
+    settings = Settings.from_env()
+
+    assert settings.camera_source == "7"
+    assert settings.event_cooldown_seconds == 12

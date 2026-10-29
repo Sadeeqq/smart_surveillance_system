@@ -1,2 +1,3 @@
 # Phase 0 keeps the application startable without camera or model dependencies.
+python-dotenv>=1.0,<2.0
 pytest>=8.0,<9.0

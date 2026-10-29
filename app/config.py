@@ -6,6 +6,8 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 
 def _read_bool(name: str, default: bool) -> bool:
     value = os.getenv(name)
@@ -52,7 +54,8 @@ class Settings:
 
     @classmethod
     def from_env(cls) -> "Settings":
-        """Read SSS_* variables; missing optional values use local defaults."""
+        """Read SSS_* variables and optional local .env; missing values default safely."""
+        load_dotenv(dotenv_path=Path.cwd() / ".env")
         confidence = _read_float("SSS_CONFIDENCE_THRESHOLD", 0.5)
         if not 0.0 <= confidence <= 1.0:
             raise ValueError("SSS_CONFIDENCE_THRESHOLD must be between 0 and 1")
