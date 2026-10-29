@@ -1,0 +1,2 @@
+# Phase 0 keeps the application startable without camera or model dependencies.
+pytest>=8.0,<9.0
