@@ -14,6 +14,9 @@
 | Use the small Ultralytics YOLO11n detection checkpoint as the Phase 2 prototype candidate, without committing its weights | It is the smallest YOLO11 detection model listed by Ultralytics and provides a pretrained COCO person class. This is only a prototype candidate; CPU performance and suitability on the target camera footage need measurement. Ultralytics states its code and trained models are AGPL-3.0 by default. Distribution under that route requires licensing the complete application accordingly; private/commercial use may require an Enterprise licence. |
 | Keep person detection behind an injectable detector interface and leave model loading optional/lazy | Keeps the camera path usable without a model installation and makes detector unit tests independent of large model packages and weights. |
 | Use Ultralytics' supported `model.track()` API with ByteTrack for Phase 3, with persistent state scoped to one video source | Reuses the installed detector runtime, avoids a second tracking dependency, and provides temporary IDs across consecutive frames. Tracker settings can be selected centrally and overridden with the Ultralytics tracker YAML configuration. |
+| Use normalized endpoint coordinates and pixel-scaled signed distance for Phase 4 boundary geometry | The boundary retains relative placement across frame resolutions, while distance and the neutral zone are evaluated in the current frame's pixel geometry. A-to-B is negative-to-positive relative to the ordered endpoints. |
+| Use a local JSON boundary settings file for Phase 4, keyed by a hash of the camera source | Enables per-camera save/reload before SQLite is introduced in Phase 6, without persisting stream URLs or credentials. The file lives under Git-ignored `data/`. |
+| Start Phase 4 debounce with a 1% frame-diagonal neutral zone, two-frame initial-side and crossing confirmation, five-second per-track cooldown, and 30-frame lost-track retention | Provides explicit, testable prototype defaults. These values require evaluation on representative camera footage and are not accuracy guarantees. |
 
 ## Open decisions to validate
 
@@ -23,6 +26,6 @@
 | Which dedicated face detector and whether DeepFace + FaceNet is viable? | Explicit candidate; licensing, dependency, runtime and false-match checks required. | Phase 5 evaluation on authorized samples. |
 | Which camera/OS combinations will be listed as supported? | Compatibility varies by DroidCam client and transport. | Test and document actual combinations in Phase 1 and later platform checks. |
 | What retention duration and operator access policy apply? | PRD leaves retention and roles open and requires definition before real deployment. | Use conservative prototype handling; decide before any real deployment. |
-| What debounce, re-arm and recognition thresholds are suitable? | Depend on representative footage and model behaviour; must not be guessed as accuracy guarantees. | Define and measure in Phases 4 and 5. |
+| What debounce values are suitable for deployment footage? | Current Phase 4 values are prototype defaults and have not been tuned on representative deployment footage. | Measure false/missed crossings on recorded and live footage in Phases 4 and 8. |
 
 The Phase 2 candidate is documented above; it is not represented as production-ready or legally approved for every deployment. No untested platform is presented as supported.

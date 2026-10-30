@@ -8,8 +8,8 @@ flowchart LR
     A --> F[OpenCV frames]
     F --> D[YOLO person detector]
     D --> T[ByteTrack tracker]
-    T --> B[Virtual boundary engine]
-    B -->|confirmed crossing| E[Event manager]
+    T --> B[Normalized virtual boundary engine]
+    B -->|direction-checked crossing candidate| E[Event manager]
     B --> X[Face detection and quality gate]
     X --> P[Optional CLAHE and recognition]
     P --> E
@@ -20,5 +20,7 @@ flowchart LR
 ```
 
 The dashboard calls services and displays their status; it does not own detection, tracking, geometry, or persistence logic. Tracker IDs are temporary. A missing or unknown face is not a threat classification. The initial DroidCam-over-Wi-Fi path is replaceable by a webcam, test video, or another adapter that meets the camera contract. Actual operating-system and camera combinations are supported only after being tested and documented.
+
+Phase 4 keeps geometry and crossing state in `app/boundary.py`, independent of the OpenCV editor. The editor is a temporary operator tool; Phase 7 can replace it with Streamlit controls while reusing the same boundary configuration and engine. Its JSON settings file is local-only until the Phase 6 database settings layer is implemented.
 
 See [INTERFACES.md](INTERFACES.md) for the initial contracts and [DECISIONS.md](DECISIONS.md) for unresolved choices.

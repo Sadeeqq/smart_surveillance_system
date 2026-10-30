@@ -1,6 +1,6 @@
 # Smart Surveillance System
 
-A local-first prototype for detecting and tracking people and creating an event when a tracked person crosses an operator-configured virtual line. Face processing is optional enrichment, and an unknown/no-match result is not evidence of wrongdoing. The project is being built incrementally according to the PRD. Phase 3 adds ByteTrack temporary IDs and a trajectory preview; boundary events and later pipeline stages have not been implemented yet.
+A local-first prototype for detecting and tracking people and creating an event when a tracked person crosses an operator-configured virtual line. Face processing is optional enrichment, and an unknown/no-match result is not evidence of wrongdoing. The project is being built incrementally according to the PRD. Phase 4 adds a normalized, editable boundary and direction-aware, debounced crossing events; face processing and later pipeline stages are not implemented yet.
 
 ## Requirements
 
@@ -45,6 +45,17 @@ python -m app.tracking_test path/to/test-video.mp4 --image-size 320
 
 Press `q` or Esc to close. `SSS_TRACKING_CONFIDENCE_THRESHOLD` controls the detector threshold supplied to tracking (default `0.1`, allowing ByteTrack to use lower-confidence detections), `SSS_TRACKER_CONFIG` selects an Ultralytics tracker YAML (default `bytetrack.yaml`), and `SSS_TRACKING_TRAIL_LENGTH` controls how many recent points are drawn. The tracking command also accepts `--confidence`, `--tracker`, `--trail-length`, `--image-size`, and `--device` overrides. See [docs/TEST_PLAN.md](docs/TEST_PLAN.md) for the Phase 3 manual check.
 
+## Virtual boundary preview and editor (Phase 4)
+
+Phase 4 adds a line editor and direction-aware crossing engine. The endpoints are normalized so the line retains its relative placement when frame dimensions change. Prototype defaults establish a track's initial side over two observations, confirm a crossing over two frames, ignore a neutral zone equal to 1% of the frame diagonal, and apply a five-second per-track cooldown. These are testable starting values, not accuracy guarantees. The editor saves settings per camera under the Git-ignored `data/boundaries.json`, keyed by a SHA-256-derived source ID; the source URL itself is not written to the file. Settings are planned to move into SQLite in Phase 6.
+
+```bash
+python -m app.boundary_test /dev/video2 --image-size 256
+python -m app.boundary_test path/to/test-video.mp4 --image-size 256
+```
+
+Click twice to draw the line. Drag an endpoint to rotate or resize it; drag near the midpoint to move it. Press `1` for A-to-B, `2` for B-to-A, `3` for both directions, `e` to enable/disable, `s` to save, `r` to reset and save the disabled default, and `q` or Esc to quit. A-to-B means movement from the negative to positive signed side of the oriented start-to-end line. Confirmed crossings appear in the terminal as structured event candidates; SQLite event persistence is planned for Phase 6.
+
 **Licensing:** Ultralytics states that its code and trained models are AGPL-3.0 by default. Using them in a distributed application may require licensing the complete combined project under AGPL-3.0 or obtaining an Ultralytics Enterprise licence. Review [Ultralytics licensing](https://www.ultralytics.com/license) before distributing or deploying this integration. The project has not yet selected a final distribution licence.
 
 ## Camera preview
@@ -70,7 +81,7 @@ python -m app.main
 pytest
 ```
 
-The camera adapter and preview utility are available in Phase 1; person detection is available in Phase 2 when its optional runtime is installed. Tracking, boundary events, face processing, persistence, notifications and the dashboard arrive in later phases. See [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), and [docs/INTERFACES.md](docs/INTERFACES.md).
+The camera adapter and preview utility are available in Phase 1; person detection is available in Phase 2 when its optional runtime is installed. Tracking and boundary crossing preview are available in Phases 3 and 4. Face processing, event persistence, notifications and the dashboard arrive in later phases. See [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), and [docs/INTERFACES.md](docs/INTERFACES.md).
 
 ## Local data
 

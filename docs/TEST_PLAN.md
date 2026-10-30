@@ -40,3 +40,12 @@ Phase 2 must verify actual model inference on test footage separately from mocke
 - Real-runtime smoke check: bundled Ultralytics `bus.jpg`, pretrained `yolo11n.pt`, CPU, image size 320, two repeated frames — ByteTrack returned four person IDs (1–4) on both calls. This confirms the installed ByteTrack dependency and wrapper/API integration; repeated still frames do not establish movement or occlusion stability. PyTorch emitted non-fatal NNPACK unsupported-hardware warnings on this Atom CPU.
 - User manual live-camera check: DroidCam virtual-camera source `/dev/video2`, with its virtual-camera output active, CPU, image size 256 — user reports ByteTrack follows the moving person with the same temporary track number. FPS remained slow; no exact value was reported at 256. This confirms basic live ID continuity, not performance or accuracy guarantees.
 - The recorded-video preview remains available for repeatable checks: `.venv/bin/python -m app.tracking_test path/to/test-video.mp4`. IDs may change after occlusion, missed detections or stream restart; they are not identities. Additional multi-person, occlusion and recorded-footage checks remain for later reliability evaluation.
+
+## Phase 4 verification record (implementation review)
+
+- Geometry: normalized endpoints are mapped to actual frame dimensions; signed-side calculations are tested at multiple frame sizes.
+- State logic: tests cover initial appearance (no event), enabled/disabled direction, disabled line, neutral-zone jitter, a one-frame side change, confirmed crossing, reverse crossing/re-arm, per-track cooldown, event fields and setting validation.
+- Settings: JSON save/reload is tested per camera. Camera IDs are SHA-256-derived and raw source URLs are not stored. The file is local-only until migration to SQLite in Phase 6.
+- Automated: `.venv/bin/python -m pytest -q` — 36 passed, 0 failed, 0 skipped. This includes fake-observation tests for the crossing engine and mouse-editor coordinate tests; it does not validate live camera/tracker performance.
+- CLI: `.venv/bin/python -m app.boundary_test --help` — passed.
+- Manual (user-reported): the live boundary editor, saving and reloading the line, and the direction-aware crossing check all worked with the user's DroidCam setup at `/dev/video2`. The user reports the preview and controls work; no exact FPS or separate jitter benchmark was reported. Other cameras and footage remain unverified.
