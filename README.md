@@ -1,6 +1,6 @@
 # Smart Surveillance System
 
-A local-first prototype for detecting and tracking people and creating an event when a tracked person crosses an operator-configured virtual line. Face processing is optional enrichment, and an unknown/no-match result is not evidence of wrongdoing. The project is being built incrementally according to the PRD. Phase 4 adds a normalized, editable boundary and direction-aware, debounced crossing events; face processing and later pipeline stages are not implemented yet.
+A local-first prototype for detecting and tracking people and creating an event when a tracked person crosses an operator-configured virtual line. Face processing is optional enrichment, and an unknown/no-match result is not evidence of wrongdoing. The project is being built incrementally according to the PRD. Phase 5 adds event-linked face capture, a crop quality gate, optional CLAHE comparison and a replaceable optional recognition adapter. Event database persistence and dashboard integration are later phases.
 
 ## Requirements
 
@@ -56,6 +56,52 @@ python -m app.boundary_test path/to/test-video.mp4 --image-size 256
 
 Click twice to draw the line. Drag an endpoint to rotate or resize it; drag near the midpoint to move it. Press `1` for A-to-B, `2` for B-to-A, `3` for both directions, `e` to enable/disable, `s` to save, `r` to reset and save the disabled default, and `q` or Esc to quit. A-to-B means movement from the negative to positive signed side of the oriented start-to-end line. Confirmed crossings appear in the terminal as structured event candidates; SQLite event persistence is planned for Phase 6.
 
+## Face capture preview (Phase 5)
+
+The detector uses OpenCV's YuNet adapter. Download the OpenCV Zoo model into the Git-ignored `models/` folder (the model file is not pushed with the repository):
+
+```bash
+mkdir -p models
+curl -L --fail -o models/face_detection_yunet_2023mar.onnx https://github.com/opencv/opencv_zoo/raw/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx
+```
+
+Start the phone feed and configure/enable your saved boundary as in Phase 4. Then run:
+
+```bash
+python -m app.boundary_test /dev/video2 --image-size 256 --face-capture
+```
+
+For a simple face-detection check with no YOLO, tracking, or boundary logic, run the standalone preview instead:
+
+```bash
+python -m app.face_detection_test /dev/video2
+```
+
+It draws a box, confidence and five facial landmark points for each detected face. Press `q` or Esc to close. You can also test a recorded video by passing its path instead of `/dev/video2`, and adjust the detector confidence with `--threshold 0.5`.
+
+To preview face detection and person detection/tracking together, without drawing or evaluating a boundary, run:
+
+```bash
+python -m app.person_face_tracking_test /dev/video2 --image-size 256
+```
+
+The preview draws green person boxes with ByteTrack IDs and orange face boxes with YuNet confidence/landmarks. The top-left status shows current person and face counts plus combined processing FPS. Press `q` or Esc to close. Since this runs YOLO tracking and face detection on every frame, its FPS can be lower than either standalone preview.
+
+When a tracked person crosses the line, the terminal prints the crossing event and a separate face-capture result. Possible results include `captured`, `no_face`, `face_not_in_crossing_track_box`, `low_quality`, and `unavailable`; quality output includes face dimensions, brightness, sharpness indicator and individual checks. For this manual check, use a consenting subject who is close enough for a clear, front-facing image, with even lighting. The crop is processed in memory and is not saved. CLAHE metrics for the original and luminance-enhanced crop are printed for comparison; they are basic image indicators, not identity or accuracy scores.
+
+Recognition is optional and off unless a caller supplies consented enrolled reference images to `DeepFaceFaceNetRecognizer`. The DeepFace package/model weights are not installed or downloaded by default; installing that optional runtime can take substantial disk space and model weights may download on first use. A `known` result is a candidate similarity outcome, not verified identity; results near the threshold remain `inconclusive`. Face thresholds need validation on a labeled, consented set before any accuracy or false-match claims. Do not commit face images or enrolled references.
+
+To try the optional comparison from the boundary preview, first install DeepFace only if you have enough disk space, then pass an explicitly consented reference image stored outside the repository:
+
+```bash
+python -m pip install deepface
+python -m app.boundary_test /dev/video2 --image-size 256 --face-capture --recognize --enrolled-face "self=/absolute/path/to/consented-reference.jpg"
+```
+
+The CLI attempts recognition only after a face passes the capture quality gate. Without references it reports `unknown`; missing DeepFace or model errors report `unavailable`; near-threshold comparisons report `inconclusive`. This is an experimental similarity comparison, not a security decision. DeepFace's wrapper is MIT licensed, but its documentation says underlying model licenses are inherited; review the exact weights before distribution.
+
+The YuNet model is from [OpenCV Zoo](https://github.com/opencv/opencv_zoo/tree/main/models/face_detection_yunet) and its model directory specifies MIT licensing. DeepFace's wrapper is MIT licensed, but its documentation says underlying model licenses are inherited; review the exact weights before distribution.
+
 **Licensing:** Ultralytics states that its code and trained models are AGPL-3.0 by default. Using them in a distributed application may require licensing the complete combined project under AGPL-3.0 or obtaining an Ultralytics Enterprise licence. Review [Ultralytics licensing](https://www.ultralytics.com/license) before distributing or deploying this integration. The project has not yet selected a final distribution licence.
 
 ## Camera preview
@@ -81,7 +127,7 @@ python -m app.main
 pytest
 ```
 
-The camera adapter and preview utility are available in Phase 1; person detection is available in Phase 2 when its optional runtime is installed. Tracking and boundary crossing preview are available in Phases 3 and 4. Face processing, event persistence, notifications and the dashboard arrive in later phases. See [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), and [docs/INTERFACES.md](docs/INTERFACES.md).
+The camera adapter and preview utility are available in Phase 1; person detection is available in Phase 2 when its optional runtime is installed. Tracking and boundary crossing preview are available in Phases 3 and 4. Phase 5 face capture is optional and can be tried through the boundary preview. Event persistence, notifications and the dashboard arrive in later phases. See [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), and [docs/INTERFACES.md](docs/INTERFACES.md).
 
 ## Local data
 

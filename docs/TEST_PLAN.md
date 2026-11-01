@@ -10,6 +10,8 @@ Tests use pytest as specified in the PRD. Hardware-dependent checks will use moc
 | Failure injection | Camera loss, model load/inference errors, track loss, no/poor face, DB/image write failures, Telegram offline/disabled | 1–8 |
 | Manual evaluation | Person detection on recorded footage, lighting, angles, occlusion, multiple people, authorized face samples, CLAHE comparison, FPS/latency/CPU/RAM | 2–8 |
 
+Phase 5 unit coverage should exercise YuNet row parsing with a fake model, event-track association, no face, no associated face, low crop quality, detector failure, original-preserving CLAHE, and each optional-recognizer outcome. Real YuNet model loading/inference is a separate smoke check. Recognition accuracy or false-match rates require labeled, consented enrollment and probe sets; a score or library threshold alone is not an accuracy measurement.
+
 For each phase, record exact commands, pass/fail/skip counts, the environment, and unverified manual scenarios. Never treat startup alone as acceptance. Camera adapter tests use fake captures and a generated recorded-video source; at least one real camera configuration still requires a manual check. Configuration tests cover safe defaults, invalid values and local `.env` precedence.
 
 Phase 2 must verify actual model inference on test footage separately from mocked detector unit tests. Record model/checkpoint source, runtime versions, CPU/GPU choice, confidence and image-size settings, and observed FPS. Do not commit downloaded weights or sample footage containing identifiable people.
@@ -49,3 +51,15 @@ Phase 2 must verify actual model inference on test footage separately from mocke
 - Automated: `.venv/bin/python -m pytest -q` — 36 passed, 0 failed, 0 skipped. This includes fake-observation tests for the crossing engine and mouse-editor coordinate tests; it does not validate live camera/tracker performance.
 - CLI: `.venv/bin/python -m app.boundary_test --help` — passed.
 - Manual (user-reported): the live boundary editor, saving and reloading the line, and the direction-aware crossing check all worked with the user's DroidCam setup at `/dev/video2`. The user reports the preview and controls work; no exact FPS or separate jitter benchmark was reported. Other cameras and footage remain unverified.
+
+## Phase 5 verification record (implementation review)
+
+- The first implementation adds an OpenCV YuNet face-detector adapter, association to the crossing event's temporary person-track box, and a quality gate for minimum dimensions, brightness, sharpness, detector confidence and visible/unclipped face landmarks.
+- Every face capture attempt returns an explicit status and reason. The crossing event is passed through independently; failed, absent, or poor-quality face capture does not cancel it. The crop stays in memory; this phase does not save frames or enroll people.
+- CLAHE changes only Lab luminance and returns a separate image; simple brightness and sharpness indicators are available to compare original and processed variants. These indicators are not recognition-accuracy metrics.
+- `DeepFaceFaceNetRecognizer` is an optional lazy adapter. It reports known, unknown, inconclusive, or unavailable and accepts caller-supplied reference images. The DeepFace runtime is not installed by default; model runtime, false-match performance and underlying weight licenses remain to be evaluated before deployment.
+- Automated: `.venv/bin/python -m pytest -q` — 42 passed, 0 failed, 0 skipped (includes 36 earlier phase tests and six Phase 5 tests using fake detector/recognizer outputs).
+- CLI: `.venv/bin/python -m app.boundary_test --help` — passed; `--face-capture` is opt-in.
+- Real model smoke check: downloaded the 227 KB OpenCV Zoo `face_detection_yunet_2023mar.onnx` to Git-ignored `models/`; OpenCV 4.14 loaded it and returned zero detections for a synthetic blank 640×480 frame. This checks model load/inference API only; it does not evaluate recall, quality thresholds, face association on live video, or recognition accuracy.
+- Manual live check (user-reported terminal screenshots): `.venv/bin/python -m app.boundary_test /dev/video2 --image-size 256 --face-capture` — passed for two observed crossings on track 22. Both produced a boundary event and `capture_status: captured`; face crops were 184×267 and 212×265 pixels, and all reported checks (minimum dimensions, brightness, sharpness, detector confidence and visibility) passed. This confirms live face detection/association and the quality-gated capture path on the user's DroidCam feed; it does not test identity recognition or establish recognition accuracy.
+- The console also printed repeated PyTorch NNPACK unsupported-hardware warnings while inference continued. They were non-fatal; live event and face-capture output followed them. CPU performance remains limited on the current machine.

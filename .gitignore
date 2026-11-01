@@ -12,6 +12,8 @@ data/**
 !data/.gitkeep
 models/**
 !models/.gitkeep
+*.pt
+*.onnx
 *.db
 *.sqlite
 *.sqlite3

@@ -17,6 +17,15 @@ from app.boundary import (
 )
 from app.camera import CameraState, OpenCVCameraSource
 from app.config import Settings
+from app.face_processing import (
+    FaceCaptureService,
+    FaceImageProcessor,
+    FaceProcessingError,
+    DeepFaceFaceNetRecognizer,
+    RecognitionResult,
+    RecognitionStatus,
+    YuNetFaceDetector,
+)
 from app.tracker import ByteTrackPersonTracker, TrackerError, TrajectoryAnnotator
 
 
@@ -112,7 +121,27 @@ def main() -> int:
     parser.add_argument("--trail-length", type=int, default=settings.tracking_trail_length)
     parser.add_argument("--boundary-file", default="data/boundaries.json",
                         help="Local JSON file used to save per-camera line settings")
+    parser.add_argument("--face-capture", action="store_true",
+                        help="Try a consented, in-memory YuNet face capture on each crossing")
+    parser.add_argument("--face-model", default="models/face_detection_yunet_2023mar.onnx",
+                        help="Local YuNet ONNX model path (model weights are not committed)")
+    parser.add_argument("--recognize", action="store_true",
+                        help="Optionally compare usable face crops with explicit local references")
+    parser.add_argument("--enrolled-face", action="append", default=[], metavar="NAME=PATH",
+                        help="Consented reference image; repeat for multiple references (requires --recognize)")
     args = parser.parse_args()
+    if args.recognize and not args.face_capture:
+        parser.error("--recognize requires --face-capture")
+    if args.enrolled_face and not args.recognize:
+        parser.error("--enrolled-face requires --recognize")
+    enrolled_faces: dict[str, str] = {}
+    for entry in args.enrolled_face:
+        name, separator, path = entry.partition("=")
+        if not separator or not name.strip() or not path.strip():
+            parser.error("--enrolled-face must use NAME=PATH")
+        if name in enrolled_faces:
+            parser.error(f"duplicate enrolled reference name: {name}")
+        enrolled_faces[name] = path
 
     camera_id = camera_identifier(args.source)
     store = BoundaryStore(args.boundary_file)
@@ -135,7 +164,10 @@ def main() -> int:
         )
         annotator = TrajectoryAnnotator(args.trail_length)
         engine = BoundaryEngine(cooldown_seconds=settings.event_cooldown_seconds)
-    except (TrackerError, ValueError) as exc:
+        face_capture = (FaceCaptureService(YuNetFaceDetector(args.face_model))
+                        if args.face_capture else None)
+        face_recognizer = DeepFaceFaceNetRecognizer() if args.recognize else None
+    except (TrackerError, FaceProcessingError, ValueError) as exc:
         camera.release()
         print(exc)
         return 1
@@ -191,6 +223,46 @@ def main() -> int:
             cv2.imshow(window, preview)
             for event in events:
                 print(f"BOUNDARY CROSSING: {event.to_dict()}")
+                if face_capture is not None:
+                    result = face_capture.capture(event, frame, tracked_people)
+                    quality = result.quality
+                    variants = (FaceImageProcessor().variants(result.original_crop)
+                                if result.original_crop is not None else None)
+                    summary = {
+                        "event_id": result.event_id,
+                        "track_id": result.track_id,
+                        "capture_status": result.status.value,
+                        "reason": result.reason,
+                        "face_box": result.detection.box_xyxy if result.detection else None,
+                        "quality": ({"width": quality.width, "height": quality.height,
+                                     "brightness": round(quality.brightness, 1),
+                                     "laplacian_variance": round(quality.blur_score, 1),
+                                     "checks": dict(quality.checks)} if quality else None),
+                        "image_metrics_original": (FaceImageProcessor.metrics(variants.original)
+                                                   if variants else None),
+                        "image_metrics_clahe": (FaceImageProcessor.metrics(variants.clahe)
+                                                if variants else None),
+                    }
+                    print(f"FACE CAPTURE: {summary}")
+                    if face_recognizer is not None:
+                        if result.status.value != "captured":
+                            recognition = RecognitionResult(
+                                RecognitionStatus.INCONCLUSIVE,
+                                f"face_capture_{result.status.value}",
+                                model_name=face_recognizer.model_name,
+                            )
+                        else:
+                            recognition = face_recognizer.recognize(
+                                result.original_crop, enrolled_faces
+                            )
+                        print("FACE RECOGNITION: " + str({
+                            "status": recognition.status.value,
+                            "reason": recognition.reason,
+                            "identity": recognition.identity,
+                            "distance": recognition.distance,
+                            "threshold": recognition.threshold,
+                            "model": recognition.model_name,
+                        }))
 
             key = cv2.waitKey(1) & 0xFF
             if key == ord("1"):
