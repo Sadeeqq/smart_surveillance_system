@@ -17,6 +17,9 @@ from app.boundary import (
 )
 from app.camera import CameraState, OpenCVCameraSource
 from app.config import Settings
+from app.alerts import TelegramNotifier
+from app.database import DatabaseError, SQLiteRepository
+from app.event_manager import EventManager
 from app.face_processing import (
     FaceCaptureService,
     FaceImageProcessor,
@@ -27,6 +30,7 @@ from app.face_processing import (
     YuNetFaceDetector,
 )
 from app.tracker import ByteTrackPersonTracker, TrackerError, TrajectoryAnnotator
+from app.image_storage import LocalImageStore
 
 
 class _BoundaryMouseEditor:
@@ -144,11 +148,28 @@ def main() -> int:
         enrolled_faces[name] = path
 
     camera_id = camera_identifier(args.source)
-    store = BoundaryStore(args.boundary_file)
+    legacy_store = BoundaryStore(args.boundary_file)
+    repository = SQLiteRepository(settings.storage_dir / "events.sqlite3")
+    persistence_error: str | None = None
     try:
-        boundary = store.load(camera_id) or _default_boundary(camera_id)
+        repository.initialize()
+        boundary = repository.load_boundary(camera_id)
+        if boundary is None:
+            # Import existing Phase 4 JSON settings once so users keep their saved line.
+            boundary = legacy_store.load(camera_id)
+            if boundary is not None:
+                repository.save_boundary(boundary)
+                print(f"Imported saved boundary from {legacy_store.path} into {repository.path}")
+        boundary = boundary or _default_boundary(camera_id)
     except ValueError as exc:
         parser.error(str(exc))
+    except DatabaseError as exc:
+        persistence_error = str(exc)
+        print(f"PERSISTENCE UNAVAILABLE: {persistence_error}")
+        try:
+            boundary = legacy_store.load(camera_id) or _default_boundary(camera_id)
+        except ValueError as settings_error:
+            parser.error(str(settings_error))
 
     camera = OpenCVCameraSource(args.source, reconnect_attempts=settings.camera_reconnect_attempts)
     if not camera.connect():
@@ -167,10 +188,23 @@ def main() -> int:
         face_capture = (FaceCaptureService(YuNetFaceDetector(args.face_model))
                         if args.face_capture else None)
         face_recognizer = DeepFaceFaceNetRecognizer() if args.recognize else None
+        event_manager = None
+        if persistence_error is None:
+            notifier = (TelegramNotifier(settings.telegram_bot_token, settings.telegram_chat_id)
+                        if settings.telegram_enabled else None)
+            event_manager = EventManager(
+                repository,
+                LocalImageStore(settings.storage_dir / "event_images"),
+                notifier=notifier,
+            )
     except (TrackerError, FaceProcessingError, ValueError) as exc:
         camera.release()
         print(exc)
         return 1
+    except DatabaseError as exc:
+        persistence_error = str(exc)
+        event_manager = None
+        print(f"PERSISTENCE UNAVAILABLE: {exc}")
 
     started = time.monotonic()
     frame_count = 0
@@ -223,11 +257,22 @@ def main() -> int:
             cv2.imshow(window, preview)
             for event in events:
                 print(f"BOUNDARY CROSSING: {event.to_dict()}")
+                result = None
+                recognition = None
                 if face_capture is not None:
                     result = face_capture.capture(event, frame, tracked_people)
                     quality = result.quality
-                    variants = (FaceImageProcessor().variants(result.original_crop)
-                                if result.original_crop is not None else None)
+                    try:
+                        variants = (FaceImageProcessor().variants(result.original_crop)
+                                    if result.original_crop is not None else None)
+                        original_metrics = (FaceImageProcessor.metrics(variants.original)
+                                            if variants else None)
+                        clahe_metrics = (FaceImageProcessor.metrics(variants.clahe)
+                                         if variants else None)
+                    except Exception as exc:
+                        variants = None
+                        original_metrics = clahe_metrics = None
+                        print(f"IMAGE METRICS: unavailable ({exc})")
                     summary = {
                         "event_id": result.event_id,
                         "track_id": result.track_id,
@@ -238,10 +283,8 @@ def main() -> int:
                                      "brightness": round(quality.brightness, 1),
                                      "laplacian_variance": round(quality.blur_score, 1),
                                      "checks": dict(quality.checks)} if quality else None),
-                        "image_metrics_original": (FaceImageProcessor.metrics(variants.original)
-                                                   if variants else None),
-                        "image_metrics_clahe": (FaceImageProcessor.metrics(variants.clahe)
-                                                if variants else None),
+                        "image_metrics_original": original_metrics,
+                        "image_metrics_clahe": clahe_metrics,
                     }
                     print(f"FACE CAPTURE: {summary}")
                     if face_recognizer is not None:
@@ -263,6 +306,20 @@ def main() -> int:
                             "threshold": recognition.threshold,
                             "model": recognition.model_name,
                         }))
+                if event_manager is not None:
+                    handling = event_manager.handle(event, result, recognition)
+                    print("EVENT STORAGE: " + str({
+                        "persisted": handling.persisted,
+                        "duplicate": handling.duplicate,
+                        "database": str(repository.path),
+                        "face_image": handling.event.original_face_path,
+                        "clahe_image": handling.event.clahe_face_path,
+                        "image_storage_status": handling.event.image_storage_status,
+                        "alert_status": handling.alert.status,
+                        "error": handling.error,
+                    }))
+                else:
+                    print("EVENT STORAGE: unavailable; crossing event remains in console output")
 
             key = cv2.waitKey(1) & 0xFF
             if key == ord("1"):
@@ -274,16 +331,23 @@ def main() -> int:
             elif key == ord("e"):
                 editor.boundary = replace(boundary, enabled=not boundary.enabled)
             elif key == ord("s"):
-                store.save(boundary)
-                print(f"Saved boundary settings to {store.path} for camera {camera_id}")
+                if persistence_error is None:
+                    repository.save_boundary(boundary)
+                    print(f"Saved boundary settings to {repository.path} for camera {camera_id}")
+                else:
+                    legacy_store.save(boundary)
+                    print(f"Saved boundary settings to {legacy_store.path} for camera {camera_id}")
             elif key == ord("r"):
                 editor.boundary = _default_boundary(camera_id)
                 engine.reset()
-                store.save(editor.boundary)
+                if persistence_error is None:
+                    repository.save_boundary(editor.boundary)
+                else:
+                    legacy_store.save(editor.boundary)
                 print("Reset and saved the disabled default boundary")
             elif key in (ord("q"), 27):
                 return 0
-    except (TrackerError, ValueError, OSError) as exc:
+    except (DatabaseError, TrackerError, ValueError, OSError) as exc:
         print(exc)
         return 1
     finally:

@@ -1,6 +1,6 @@
 # Smart Surveillance System
 
-A local-first prototype for detecting and tracking people and creating an event when a tracked person crosses an operator-configured virtual line. Face processing is optional enrichment, and an unknown/no-match result is not evidence of wrongdoing. The project is being built incrementally according to the PRD. Phase 5 adds event-linked face capture, a crop quality gate, optional CLAHE comparison and a replaceable optional recognition adapter. Event database persistence and dashboard integration are later phases.
+A local-first prototype for detecting and tracking people and creating an event when a tracked person crosses an operator-configured virtual line. Face processing is optional enrichment, and an unknown/no-match result is not evidence of wrongdoing. The project is being built incrementally according to the PRD. Phase 5 adds event-linked face capture and quality checks; Phase 6 adds SQLite persistence, local face-image files, and optional Telegram alerts.
 
 ## Requirements
 
@@ -47,14 +47,14 @@ Press `q` or Esc to close. `SSS_TRACKING_CONFIDENCE_THRESHOLD` controls the dete
 
 ## Virtual boundary preview and editor (Phase 4)
 
-Phase 4 adds a line editor and direction-aware crossing engine. The endpoints are normalized so the line retains its relative placement when frame dimensions change. Prototype defaults establish a track's initial side over two observations, confirm a crossing over two frames, ignore a neutral zone equal to 1% of the frame diagonal, and apply a five-second per-track cooldown. These are testable starting values, not accuracy guarantees. The editor saves settings per camera under the Git-ignored `data/boundaries.json`, keyed by a SHA-256-derived source ID; the source URL itself is not written to the file. Settings are planned to move into SQLite in Phase 6.
+Phase 4 adds a line editor and direction-aware crossing engine. The endpoints are normalized so the line retains its relative placement when frame dimensions change. Prototype defaults establish a track's initial side over two observations, confirm a crossing over two frames, ignore a neutral zone equal to 1% of the frame diagonal, and apply a five-second per-track cooldown. These are testable starting values, not accuracy guarantees. Phase 6 saves settings per camera in `data/events.sqlite3`, keyed by a SHA-256-derived source ID; the source URL itself is not written to the database. On first run after the upgrade, a matching legacy `data/boundaries.json` setting is copied into SQLite.
 
 ```bash
 python -m app.boundary_test /dev/video2 --image-size 256
 python -m app.boundary_test path/to/test-video.mp4 --image-size 256
 ```
 
-Click twice to draw the line. Drag an endpoint to rotate or resize it; drag near the midpoint to move it. Press `1` for A-to-B, `2` for B-to-A, `3` for both directions, `e` to enable/disable, `s` to save, `r` to reset and save the disabled default, and `q` or Esc to quit. A-to-B means movement from the negative to positive signed side of the oriented start-to-end line. Confirmed crossings appear in the terminal as structured event candidates; SQLite event persistence is planned for Phase 6.
+Click twice to draw the line. Drag an endpoint to rotate or resize it; drag near the midpoint to move it. Press `1` for A-to-B, `2` for B-to-A, `3` for both directions, `e` to enable/disable, `s` to save, `r` to reset and save the disabled default, and `q` or Esc to quit. A-to-B means movement from the negative to positive signed side of the oriented start-to-end line. Confirmed crossings appear in the terminal as structured event records and are saved to SQLite by Phase 6.
 
 ## Face capture preview (Phase 5)
 
@@ -87,7 +87,7 @@ python -m app.person_face_tracking_test /dev/video2 --image-size 256
 
 The preview draws green person boxes with ByteTrack IDs and orange face boxes with YuNet confidence/landmarks. The top-left status shows current person and face counts plus combined processing FPS. Press `q` or Esc to close. Since this runs YOLO tracking and face detection on every frame, its FPS can be lower than either standalone preview.
 
-When a tracked person crosses the line, the terminal prints the crossing event and a separate face-capture result. Possible results include `captured`, `no_face`, `face_not_in_crossing_track_box`, `low_quality`, and `unavailable`; quality output includes face dimensions, brightness, sharpness indicator and individual checks. For this manual check, use a consenting subject who is close enough for a clear, front-facing image, with even lighting. The crop is processed in memory and is not saved. CLAHE metrics for the original and luminance-enhanced crop are printed for comparison; they are basic image indicators, not identity or accuracy scores.
+When a tracked person crosses the line, the terminal prints the crossing event and a separate face-capture result. Possible results include `captured`, `no_face`, `face_not_in_crossing_track_box`, `low_quality`, and `unavailable`; quality output includes face dimensions, brightness, sharpness indicator and individual checks. For this manual check, use a consenting subject who is close enough for a clear, front-facing image, with even lighting. In Phase 5 the crop was only held in memory; with Phase 6 integration, a captured face is saved as a local file alongside the persisted event. CLAHE metrics for the original and luminance-enhanced crop are printed for comparison; they are basic image indicators, not identity or accuracy scores.
 
 Recognition is optional and off unless a caller supplies consented enrolled reference images to `DeepFaceFaceNetRecognizer`. The DeepFace package/model weights are not installed or downloaded by default; installing that optional runtime can take substantial disk space and model weights may download on first use. A `known` result is a candidate similarity outcome, not verified identity; results near the threshold remain `inconclusive`. Face thresholds need validation on a labeled, consented set before any accuracy or false-match claims. Do not commit face images or enrolled references.
 
@@ -101,6 +101,24 @@ python -m app.boundary_test /dev/video2 --image-size 256 --face-capture --recogn
 The CLI attempts recognition only after a face passes the capture quality gate. Without references it reports `unknown`; missing DeepFace or model errors report `unavailable`; near-threshold comparisons report `inconclusive`. This is an experimental similarity comparison, not a security decision. DeepFace's wrapper is MIT licensed, but its documentation says underlying model licenses are inherited; review the exact weights before distribution.
 
 The YuNet model is from [OpenCV Zoo](https://github.com/opencv/opencv_zoo/tree/main/models/face_detection_yunet) and its model directory specifies MIT licensing. DeepFace's wrapper is MIT licensed, but its documentation says underlying model licenses are inherited; review the exact weights before distribution.
+
+## Event persistence and Telegram alerts (Phase 6)
+
+The boundary preview saves each confirmed crossing to `data/events.sqlite3`. Database metadata includes event time, camera hash, temporary track ID, boundary and direction, detection confidence, face-capture and quality outcomes, optional recognition outcome, image paths, and Telegram delivery status. Events use their generated event ID as a primary key; duplicate IDs are ignored and are not notified twice. Existing Phase 4 boundary settings are imported from `data/boundaries.json` if they are not already present in SQLite.
+
+When face capture succeeds, the original crop and the optional CLAHE variant are written as JPEG files beneath `data/event_images/`; only file paths and capture metadata are stored in SQLite. A face-capture failure still persists the crossing event with its status and reason. If image writing fails, the event is still saved with `image_storage_status=failed`. The database and image folder are local and Git-ignored.
+
+Telegram is disabled by default. To enable it, create a private local `.env` from `.env.example` and set the following values. Never commit the token:
+
+```dotenv
+SSS_TELEGRAM_ENABLED=true
+SSS_TELEGRAM_BOT_TOKEN=your_bot_token
+SSS_TELEGRAM_CHAT_ID=your_chat_id
+```
+
+With `SSS_TELEGRAM_ENABLED=true`, the system sends a text-only crossing summary after committing the event locally. Missing configuration is marked skipped; a network/API failure is recorded as failed and does not delete or roll back the SQLite event. Telegram requires internet; camera processing, SQLite, and local image storage do not.
+
+The repository API provides `list_events()` for the future dashboard, and `EventManager.delete_event(event_id)` deletes event metadata and its referenced face files. There is no automatic retention period yet: prototype event and face files remain until explicitly deleted. The administrator is responsible for restricting OS access to `data/`, checking disk use, and deleting data when no longer needed. Before using enrolled identities, record consent and securely remove both the database entry and its reference-image file when withdrawing enrollment. Retention duration and broader access policy remain to be set before deployment.
 
 **Licensing:** Ultralytics states that its code and trained models are AGPL-3.0 by default. Using them in a distributed application may require licensing the complete combined project under AGPL-3.0 or obtaining an Ultralytics Enterprise licence. Review [Ultralytics licensing](https://www.ultralytics.com/license) before distributing or deploying this integration. The project has not yet selected a final distribution licence.
 
@@ -127,8 +145,8 @@ python -m app.main
 pytest
 ```
 
-The camera adapter and preview utility are available in Phase 1; person detection is available in Phase 2 when its optional runtime is installed. Tracking and boundary crossing preview are available in Phases 3 and 4. Phase 5 face capture is optional and can be tried through the boundary preview. Event persistence, notifications and the dashboard arrive in later phases. See [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), and [docs/INTERFACES.md](docs/INTERFACES.md).
+The camera adapter and preview utility are available in Phase 1; person detection is available in Phase 2 when its optional runtime is installed. Tracking and boundary crossing preview are available in Phases 3 and 4. Phase 5 face capture and Phase 6 event persistence are integrated into the boundary preview. The Streamlit dashboard is planned for Phase 7. See [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), and [docs/INTERFACES.md](docs/INTERFACES.md).
 
 ## Local data
 
-`data/` and `models/` are excluded from Git. Event image retention, enrolment/removal, access controls and real-deployment policies must be defined before real use; see [docs/DECISIONS.md](docs/DECISIONS.md).
+`data/` and `models/` are excluded from Git. Phase 6 currently uses explicit deletion and no automatic retention timer. Local face images and reference images are sensitive: restrict access to the data directory and remove unneeded files. Define retention duration and real-deployment policies before use beyond a controlled prototype; see [docs/DECISIONS.md](docs/DECISIONS.md).
